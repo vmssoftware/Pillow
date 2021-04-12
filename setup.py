@@ -386,12 +386,14 @@ class pil_build_ext(build_ext):
                 _dbg("Using vendored version of %s", x)
                 self.feature.vendor.add(x)
 
-    def _update_extension(self, name, libraries, define_macros=None, sources=None):
+    def _update_extension(self, name, libraries, define_macros=None, sources=None, include_dirs=None):
         for extension in self.extensions:
             if extension.name == name:
                 extension.libraries += libraries
                 if define_macros is not None:
                     extension.define_macros += define_macros
+                if include_dirs is not None:
+                    extension.include_dirs += include_dirs
                 if sources is not None:
                     extension.sources += sources
                 if FUZZING_BUILD:
@@ -570,6 +572,11 @@ class pil_build_ext(build_ext):
             _add_directory(library_dirs, "/opt/local/lib")
             _add_directory(include_dirs, "/opt/local/include")
 
+        elif sys.platform.startswith("OpenVMS"):
+            _add_directory(library_dirs, "/oss$root/lib")
+            _add_directory(include_dirs, "/oss$root/include")
+            _add_directory(include_dirs, "src")
+
         # FIXME: check /opt/stuff directories here?
 
         # standard locations
@@ -619,6 +626,8 @@ class pil_build_ext(build_ext):
                     feature.zlib = "z"
                 elif sys.platform == "win32" and _find_library_file(self, "zlib"):
                     feature.zlib = "zlib"  # alternative name
+                elif sys.platform == "OpenVMS":
+                    feature.zlib = "libz32"
 
         if feature.want("jpeg"):
             _dbg("Looking for jpeg")
@@ -627,46 +636,54 @@ class pil_build_ext(build_ext):
                     feature.jpeg = "jpeg"
                 elif sys.platform == "win32" and _find_library_file(self, "libjpeg"):
                     feature.jpeg = "libjpeg"  # alternative name
+                elif sys.platform == "OpenVMS":
+                    feature.jpeg = "libjpeg"
 
         feature.openjpeg_version = None
         if feature.want("jpeg2000"):
-            _dbg("Looking for jpeg2000")
-            best_version = None
-            best_path = None
+            if sys.platform == "OpenVMS":
+                # hardcode available jpeg2000
+                feature.jpeg2000 = "libopenjp2"
+                feature.openjpeg_version = "2.1.0"
+                _add_directory(self.compiler.include_dirs, "/oss$root/include/openjpeg", 0)
+            else:
+                _dbg("Looking for jpeg2000")
+                best_version = None
+                best_path = None
 
-            # Find the best version
-            for directory in self.compiler.include_dirs:
-                _dbg("Checking for openjpeg-#.# in %s", directory)
-                try:
-                    listdir = os.listdir(directory)
-                except Exception:
-                    # OSError, FileNotFoundError
-                    continue
-                for name in listdir:
-                    if name.startswith("openjpeg-") and os.path.isfile(
-                        os.path.join(directory, name, "openjpeg.h")
-                    ):
-                        _dbg("Found openjpeg.h in %s/%s", (directory, name))
-                        version = tuple(int(x) for x in name[9:].split("."))
-                        if best_version is None or version > best_version:
-                            best_version = version
-                            best_path = os.path.join(directory, name)
-                            _dbg(
-                                "Best openjpeg version %s so far in %s",
-                                (best_version, best_path),
-                            )
+                # Find the best version
+                for directory in self.compiler.include_dirs:
+                    _dbg("Checking for openjpeg-#.# in %s", directory)
+                    try:
+                        listdir = os.listdir(directory)
+                    except Exception:
+                        # OSError, FileNotFoundError
+                        continue
+                    for name in listdir:
+                        if name.startswith("openjpeg-") and os.path.isfile(
+                            os.path.join(directory, name, "openjpeg.h")
+                        ):
+                            _dbg("Found openjpeg.h in %s/%s", (directory, name))
+                            version = tuple(int(x) for x in name[9:].split("."))
+                            if best_version is None or version > best_version:
+                                best_version = version
+                                best_path = os.path.join(directory, name)
+                                _dbg(
+                                    "Best openjpeg version %s so far in %s",
+                                    (best_version, best_path),
+                                )
 
-            if best_version and _find_library_file(self, "openjp2"):
-                # Add the directory to the include path so we can include
-                # <openjpeg.h> rather than having to cope with the versioned
-                # include path
-                # FIXME (melvyn-sopacua):
-                # At this point it's possible that best_path is already in
-                # self.compiler.include_dirs. Should investigate how that is
-                # possible.
-                _add_directory(self.compiler.include_dirs, best_path, 0)
-                feature.jpeg2000 = "openjp2"
-                feature.openjpeg_version = ".".join(str(x) for x in best_version)
+                if best_version and _find_library_file(self, "openjp2"):
+                    # Add the directory to the include path so we can include
+                    # <openjpeg.h> rather than having to cope with the versioned
+                    # include path
+                    # FIXME (melvyn-sopacua):
+                    # At this point it's possible that best_path is already in
+                    # self.compiler.include_dirs. Should investigate how that is
+                    # possible.
+                    _add_directory(self.compiler.include_dirs, best_path, 0)
+                    feature.jpeg2000 = "openjp2"
+                    feature.openjpeg_version = ".".join(str(x) for x in best_version)
 
         if feature.want("imagequant"):
             _dbg("Looking for imagequant")
@@ -685,29 +702,36 @@ class pil_build_ext(build_ext):
                     self, "libtiff"
                 ):
                     feature.tiff = "libtiff"
+                if sys.platform == 'OpenVMS':
+                    feature.tiff = "libtiff"
 
         if feature.want("freetype"):
             _dbg("Looking for freetype")
-            if _find_library_file(self, "freetype"):
-                # look for freetype2 include files
-                freetype_version = 0
-                for subdir in self.compiler.include_dirs:
-                    _dbg("Checking for include file %s in %s", ("ft2build.h", subdir))
-                    if os.path.isfile(os.path.join(subdir, "ft2build.h")):
-                        _dbg("Found %s in %s", ("ft2build.h", subdir))
-                        freetype_version = 21
+            if sys.platform == 'OpenVMS':
+                if os.getenv('FREETYPE'):
+                    _add_directory(self.compiler.include_dirs, "/freetype", 0)
+                    feature.freetype = "/freetype/freetype.olb"
+            else:
+                if _find_library_file(self, "freetype"):
+                    # look for freetype2 include files
+                    freetype_version = 0
+                    for subdir in self.compiler.include_dirs:
+                        _dbg("Checking for include file %s in %s", ("ft2build.h", subdir))
+                        if os.path.isfile(os.path.join(subdir, "ft2build.h")):
+                            _dbg("Found %s in %s", ("ft2build.h", subdir))
+                            freetype_version = 21
+                            subdir = os.path.join(subdir, "freetype2")
+                            break
                         subdir = os.path.join(subdir, "freetype2")
-                        break
-                    subdir = os.path.join(subdir, "freetype2")
-                    _dbg("Checking for include file %s in %s", ("ft2build.h", subdir))
-                    if os.path.isfile(os.path.join(subdir, "ft2build.h")):
-                        _dbg("Found %s in %s", ("ft2build.h", subdir))
-                        freetype_version = 21
-                        break
-                if freetype_version:
-                    feature.freetype = "freetype"
-                    if subdir:
-                        _add_directory(self.compiler.include_dirs, subdir, 0)
+                        _dbg("Checking for include file %s in %s", ("ft2build.h", subdir))
+                        if os.path.isfile(os.path.join(subdir, "ft2build.h")):
+                            _dbg("Found %s in %s", ("ft2build.h", subdir))
+                            freetype_version = 21
+                            break
+                    if freetype_version:
+                        feature.freetype = "freetype"
+                        if subdir:
+                            _add_directory(self.compiler.include_dirs, subdir, 0)
 
         if feature.freetype and feature.want("raqm"):
             if not feature.want_vendor("raqm"):  # want system Raqm
@@ -840,7 +864,7 @@ class pil_build_ext(build_ext):
 
         if feature.freetype:
             srcs = []
-            libs = ["freetype"]
+            libs = [feature.freetype]
             defs = []
             if feature.raqm:
                 if not feature.want_vendor("raqm"):  # using system Raqm
