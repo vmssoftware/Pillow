@@ -168,10 +168,17 @@ _unop(PyObject *self, PyObject *args) {
     Imaging im1;
     void (*unop)(Imaging, Imaging);
 
+#ifdef __VMS
+    intptr_t op, i0, i1;
+    if (!PyArg_ParseTuple(args, "LLL", &op, &i0, &i1)) {
+        return NULL;
+    }
+#else
     Py_ssize_t op, i0, i1;
     if (!PyArg_ParseTuple(args, "nnn", &op, &i0, &i1)) {
         return NULL;
     }
+#endif
 
     out = (Imaging)i0;
     im1 = (Imaging)i1;
@@ -191,11 +198,17 @@ _binop(PyObject *self, PyObject *args) {
     Imaging im2;
     void (*binop)(Imaging, Imaging, Imaging);
 
+#ifdef __VMS
+    intptr_t op, i0, i1, i2;
+    if (!PyArg_ParseTuple(args, "LLLL", &op, &i0, &i1, &i2)) {
+        return NULL;
+    }
+#else
     Py_ssize_t op, i0, i1, i2;
     if (!PyArg_ParseTuple(args, "nnnn", &op, &i0, &i1, &i2)) {
         return NULL;
     }
-
+#endif
     out = (Imaging)i0;
     im1 = (Imaging)i1;
     im2 = (Imaging)i2;
@@ -213,7 +226,11 @@ static PyMethodDef _functions[] = {
 
 static void
 install(PyObject *d, char *name, void *value) {
+#ifdef __VMS
+    PyObject *v = PyLong_FromVoidPtr(value);
+#else
     PyObject *v = PyLong_FromSsize_t((Py_ssize_t)value);
+#endif
     if (!v || PyDict_SetItemString(d, name, v)) {
         PyErr_Clear();
     }

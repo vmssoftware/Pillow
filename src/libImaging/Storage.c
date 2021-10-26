@@ -428,9 +428,15 @@ ImagingAllocateArray(Imaging im, int dirty, int block_size) {
             }
             im->blocks[current_block] = block;
             /* Bulletproof code from libc _int_memalign */
+        #ifdef __VMS
+            aligned_ptr = (char *)(
+                ((intptr_t) (block.ptr + arena->alignment - 1)) &
+                -((intptr_t) arena->alignment));
+        #else
             aligned_ptr = (char *)(
                 ((size_t) (block.ptr + arena->alignment - 1)) &
                 -((Py_ssize_t) arena->alignment));
+        #endif
         }
 
         im->image[y] = aligned_ptr + aligned_linesize * line_in_block;

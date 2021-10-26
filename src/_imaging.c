@@ -3538,7 +3538,11 @@ _getattr_bands(ImagingObject *self, void *closure) {
 
 static PyObject *
 _getattr_id(ImagingObject *self, void *closure) {
+#ifdef __VMS
+    return PyLong_FromVoidPtr(self->image);
+#else
     return PyLong_FromSsize_t((Py_ssize_t)self->image);
+#endif
 }
 
 static PyObject *

@@ -38,8 +38,11 @@
  *
  * See the README file for information on usage and redistribution.
  */
-
+#ifdef __VMS
+#include "libImaging/Imaging.h"
+#else
 #include "../libImaging/Imaging.h"
+#endif
 #include "_tkmini.h"
 
 #include <stdlib.h>

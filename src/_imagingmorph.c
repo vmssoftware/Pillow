@@ -31,17 +31,29 @@ static PyObject *
 apply(PyObject *self, PyObject *args) {
     const char *lut;
     PyObject *py_lut;
+#ifdef __VMS
+    Py_ssize_t lut_len;
+    intptr_t i0, i1;
+#else
     Py_ssize_t lut_len, i0, i1;
+#endif
     Imaging imgin, imgout;
     int width, height;
     int row_idx, col_idx;
     UINT8 **inrows, **outrows;
     int num_changed_pixels = 0;
 
+#ifdef __VMS
+    if (!PyArg_ParseTuple(args, "OLL", &py_lut, &i0, &i1)) {
+        PyErr_SetString(PyExc_RuntimeError, "Argument parsing problem");
+        return NULL;
+    }
+#else
     if (!PyArg_ParseTuple(args, "Onn", &py_lut, &i0, &i1)) {
         PyErr_SetString(PyExc_RuntimeError, "Argument parsing problem");
         return NULL;
     }
+#endif
 
     if (!PyBytes_Check(py_lut)) {
         PyErr_SetString(PyExc_RuntimeError, "The morphology LUT is not a bytes object");
@@ -130,17 +142,29 @@ static PyObject *
 match(PyObject *self, PyObject *args) {
     const char *lut;
     PyObject *py_lut;
+#ifdef __VMS
+    Py_ssize_t lut_len;
+    intptr_t i0;
+#else
     Py_ssize_t lut_len, i0;
+#endif
     Imaging imgin;
     int width, height;
     int row_idx, col_idx;
     UINT8 **inrows;
     PyObject *ret = PyList_New(0);
 
+#ifdef __VMS
+    if (!PyArg_ParseTuple(args, "OL", &py_lut, &i0)) {
+        PyErr_SetString(PyExc_RuntimeError, "Argument parsing problem");
+        return NULL;
+    }
+#else
     if (!PyArg_ParseTuple(args, "On", &py_lut, &i0)) {
         PyErr_SetString(PyExc_RuntimeError, "Argument parsing problem");
         return NULL;
     }
+#endif
 
     if (!PyBytes_Check(py_lut)) {
         PyErr_SetString(PyExc_RuntimeError, "The morphology LUT is not a bytes object");
@@ -207,18 +231,29 @@ match(PyObject *self, PyObject *args) {
 */
 static PyObject *
 get_on_pixels(PyObject *self, PyObject *args) {
+#ifdef __VMS
+    intptr_t i0;
+#else
     Py_ssize_t i0;
+#endif
     Imaging img;
     UINT8 **rows;
     int row_idx, col_idx;
     int width, height;
     PyObject *ret = PyList_New(0);
 
+#ifdef __VMS
+    if (!PyArg_ParseTuple(args, "L", &i0)) {
+        PyErr_SetString(PyExc_RuntimeError, "Argument parsing problem");
+        return NULL;
+    }
+#else
     if (!PyArg_ParseTuple(args, "n", &i0)) {
         PyErr_SetString(PyExc_RuntimeError, "Argument parsing problem");
 
         return NULL;
     }
+#endif
     img = (Imaging)i0;
     rows = img->image8;
     width = img->xsize;

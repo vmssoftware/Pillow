@@ -626,8 +626,10 @@ class pil_build_ext(build_ext):
                     feature.zlib = "z"
                 elif sys.platform == "win32" and _find_library_file(self, "zlib"):
                     feature.zlib = "zlib"  # alternative name
-                elif sys.platform == "OpenVMS":
+                elif sys.platform.startswith("OpenVMS"):
                     feature.zlib = "libz32"
+                    if struct.calcsize('P') == 8:
+                        feature.zlib = "libz64"
 
         if feature.want("jpeg"):
             _dbg("Looking for jpeg")
@@ -636,14 +638,18 @@ class pil_build_ext(build_ext):
                     feature.jpeg = "jpeg"
                 elif sys.platform == "win32" and _find_library_file(self, "libjpeg"):
                     feature.jpeg = "libjpeg"  # alternative name
-                elif sys.platform == "OpenVMS":
+                elif sys.platform.startswith("OpenVMS"):
                     feature.jpeg = "libjpeg"
+                    if struct.calcsize('P') == 8:
+                        feature.jpeg = "libjpeg64"
 
         feature.openjpeg_version = None
         if feature.want("jpeg2000"):
-            if sys.platform == "OpenVMS":
+            if sys.platform.startswith("OpenVMS"):
                 # hardcode available jpeg2000
                 feature.jpeg2000 = "libopenjp2"
+                if struct.calcsize('P') == 8:
+                    feature.jpeg2000 = "libopenjp2_64"
                 feature.openjpeg_version = "2.1.0"
                 _add_directory(self.compiler.include_dirs, "/oss$root/include/openjpeg", 0)
             else:
@@ -702,15 +708,18 @@ class pil_build_ext(build_ext):
                     self, "libtiff"
                 ):
                     feature.tiff = "libtiff"
-                if sys.platform == 'OpenVMS':
+                if sys.platform.startswith("OpenVMS"):
                     feature.tiff = "libtiff"
+                    if struct.calcsize('P') == 8:
+                        feature.tiff = "libtiff64"
 
         if feature.want("freetype"):
             _dbg("Looking for freetype")
-            if sys.platform == 'OpenVMS':
-                if os.getenv('FREETYPE'):
-                    _add_directory(self.compiler.include_dirs, "/freetype", 0)
-                    feature.freetype = "/freetype/freetype.olb"
+            if sys.platform.startswith("OpenVMS"):
+                _add_directory(self.compiler.include_dirs, "/oss$root/include/freetype2", 0)
+                feature.freetype = "libfreetype"
+                if struct.calcsize('P') == 8:
+                    feature.freetype = "libfreetype64"
             else:
                 if _find_library_file(self, "freetype"):
                     # look for freetype2 include files
@@ -880,6 +889,13 @@ class pil_build_ext(build_ext):
                         libs.append(feature.fribidi)
                     else:  # building FriBiDi shim from src/thirdparty
                         srcs.append("src/thirdparty/fribidi-shim/fribidi.c")
+            if sys.platform.startswith("OpenVMS"):
+                if struct.calcsize('P') == 8:
+                    libs.append('libpng64')
+                    libs.append('libz64')
+                else:
+                    libs.append('libpng')
+                    libs.append('libz32')
             self._update_extension("PIL._imagingft", libs, defs, srcs)
 
         else:

@@ -529,16 +529,27 @@ buildProofTransform(PyObject *self, PyObject *args) {
 
 static PyObject *
 cms_transform_apply(CmsTransformObject *self, PyObject *args) {
+#ifdef __VMS
+    intptr_t idIn = 0;
+    intptr_t idOut = 0;
+#else
     Py_ssize_t idIn;
     Py_ssize_t idOut;
+#endif
     Imaging im;
     Imaging imOut;
 
     int result;
 
+#ifdef __VMS
+    if (!PyArg_ParseTuple(args, "LL:apply", &idIn, &idOut)) {
+        return NULL;
+    }
+#else
     if (!PyArg_ParseTuple(args, "nn:apply", &idIn, &idOut)) {
         return NULL;
     }
+#endif
 
     im = (Imaging)idIn;
     imOut = (Imaging)idOut;
